@@ -157,9 +157,11 @@ public final class ActivityManager {
             }
         }
 
-        // Already clustered: gently circulate around the square rather than
-        // repeatedly issuing paths to the exact same block.
-        wander(villager);
+        // Already clustered closely enough for the economy heartbeat to compare
+        // inventories and perform a visible exchange.
+        if (partner != null) {
+            villager.lookAt(partner.getLocation());
+        }
     }
 
     private void goHome(Villager villager) {
