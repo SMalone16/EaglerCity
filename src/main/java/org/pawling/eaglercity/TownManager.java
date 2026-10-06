@@ -202,7 +202,9 @@ public final class TownManager {
         }
 
         if (workstation != null) {
-            return workstation;
+            // Stand in the open interior block directly in front of the
+            // workstation rather than trying to path into the solid block.
+            return workstation.clone().add(0.0, 0.0, -1.0);
         }
         return getProfileHomeLocation(villager.getWorld(), center, profile);
     }
@@ -259,6 +261,9 @@ public final class TownManager {
         int hash = villager.getUniqueId().hashCode();
         int dx = Math.floorMod(hash, 7) - 3;
         int dz = Math.floorMod(hash / 7, 7) - 3;
+        if (dx == 0 && dz == 0) {
+            dx = 2;
+        }
         int x = center.getBlockX() + dx;
         int z = center.getBlockZ() + dz;
         int y = GroundUtil.groundY(villager.getWorld(), x, z) + 1;
