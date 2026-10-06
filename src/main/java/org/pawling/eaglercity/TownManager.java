@@ -133,7 +133,7 @@ public final class TownManager {
         int baseZ = center.getBlockZ() + (int) Math.round(profile.zOffset() * factor);
         int x = baseX + (index % 2 == 0 ? -1 : 1);
         int z = baseZ + (index % 3 == 0 ? 1 : 0);
-        int y = world.getHighestBlockYAt(x, z, HeightMap.MOTION_BLOCKING_NO_LEAVES) + 1;
+        int y = GroundUtil.groundY(world, x, z) + 1;
 
         Villager villager = (Villager) world.spawnEntity(
                 new Location(world, x + 0.5, y, z + 0.5),
@@ -186,7 +186,7 @@ public final class TownManager {
         double angle = (Math.PI * 2.0 * index) / 4.0;
         int x = center.getBlockX() + (int) Math.round(Math.cos(angle) * 6.0);
         int z = center.getBlockZ() + (int) Math.round(Math.sin(angle) * 6.0);
-        int y = world.getHighestBlockYAt(x, z, HeightMap.MOTION_BLOCKING_NO_LEAVES) + 1;
+        int y = GroundUtil.groundY(world, x, z) + 1;
 
         IronGolem golem = (IronGolem) world.spawnEntity(
                 new Location(world, x + 0.5, y, z + 0.5),
@@ -320,7 +320,7 @@ public final class TownManager {
 
             double score = terrainScore(world, x, z);
             if (score < bestScore) {
-                int y = world.getHighestBlockYAt(x, z, HeightMap.MOTION_BLOCKING_NO_LEAVES) + 1;
+                int y = GroundUtil.groundY(world, x, z) + 1;
                 best = new Location(world, x + 0.5, y, z + 0.5);
                 bestScore = score;
             }
@@ -329,7 +329,7 @@ public final class TownManager {
         if (best == null) {
             int x = spawn.getBlockX() + distance;
             int z = spawn.getBlockZ();
-            int y = world.getHighestBlockYAt(x, z, HeightMap.MOTION_BLOCKING_NO_LEAVES) + 1;
+            int y = GroundUtil.groundY(world, x, z) + 1;
             best = new Location(world, x + 0.5, y, z + 0.5);
         }
 
