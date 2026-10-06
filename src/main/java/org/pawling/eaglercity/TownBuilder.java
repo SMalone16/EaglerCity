@@ -1,6 +1,5 @@
 package org.pawling.eaglercity;
 
-import org.bukkit.HeightMap;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -11,7 +10,13 @@ import org.bukkit.block.data.type.Bed;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class TownBuilder {
+    private static final int ACCESS_VERSION = 2;
+
     private TownBuilder() {
+    }
+
+    public static int accessVersion() {
+        return ACCESS_VERSION;
     }
 
     public static void buildTown(JavaPlugin plugin, World world, Location center) {
@@ -39,6 +44,30 @@ public final class TownBuilder {
                 + cx + ", " + cz + " in " + world.getName() + ".");
     }
 
+    /**
+     * Retrofitting is intentionally separate from first-time generation so worlds
+     * created by EaglerCity 1.0.0 gain reachable entrances without rebuilding or
+     * wiping the existing cottages.
+     */
+    public static void ensureTownAccess(JavaPlugin plugin, World world, Location center) {
+        int repaired = 0;
+        for (CityProfession profile : CityProfession.values()) {
+            Integer floorY = findCottageFloorY(world, center, profile);
+            if (floorY == null) {
+                plugin.getLogger().warning("Could not find " + profile.displayName()
+                        + " workstation while retrofitting cottage access.");
+                continue;
+            }
+
+            DoorInfo door = doorInfo(center, profile);
+            buildEntranceRamp(world, door.x(), door.z(), floorY, door.outX(), door.outZ());
+            repaired++;
+        }
+
+        plugin.getLogger().info("EaglerCity access retrofit checked "
+                + repaired + " cottage entrance(s) in " + world.getName() + ".");
+    }
+
     private static void buildCottage(World world, Location townCenter, CityProfession profile) {
         int cx = townCenter.getBlockX() + profile.xOffset();
         int cz = townCenter.getBlockZ() + profile.zOffset();
@@ -60,7 +89,8 @@ public final class TownBuilder {
                     }
 
                     boolean corner = (x == minX || x == maxX) && (z == minZ || z == maxZ);
-                    world.getBlockAt(x, y, z).setType(corner ? Material.OAK_LOG : Material.OAK_PLANKS, false);
+                    world.getBlockAt(x, y, z)
+                            .setType(corner ? Material.OAK_LOG : Material.OAK_PLANKS, false);
                 }
             }
         }
@@ -71,33 +101,26 @@ public final class TownBuilder {
             }
         }
 
-        // Windows on each side.
         world.getBlockAt(cx, baseY + 2, minZ).setType(Material.GLASS_PANE, false);
         world.getBlockAt(cx, baseY + 2, maxZ).setType(Material.GLASS_PANE, false);
         world.getBlockAt(minX, baseY + 2, cz).setType(Material.GLASS_PANE, false);
         world.getBlockAt(maxX, baseY + 2, cz).setType(Material.GLASS_PANE, false);
 
-        // Open a two-block doorway on the wall facing the plaza. An open doorway is
-        // more reliable for villager pathfinding than forcing a door state.
-        int doorX = cx;
-        int doorZ = cz;
-        if (Math.abs(profile.xOffset()) >= Math.abs(profile.zOffset()) && profile.xOffset() != 0) {
-            doorX = profile.xOffset() > 0 ? minX : maxX;
-        } else {
-            doorZ = profile.zOffset() > 0 ? minZ : maxZ;
-        }
-        world.getBlockAt(doorX, baseY + 1, doorZ).setType(Material.AIR, false);
-        world.getBlockAt(doorX, baseY + 2, doorZ).setType(Material.AIR, false);
-        world.getBlockAt(doorX, baseY + 3, doorZ).setType(Material.LANTERN, false);
+        DoorInfo door = doorInfo(townCenter, profile);
+        world.getBlockAt(door.x(), baseY + 1, door.z()).setType(Material.AIR, false);
+        world.getBlockAt(door.x(), baseY + 2, door.z()).setType(Material.AIR, false);
+        world.getBlockAt(door.x(), baseY + 3, door.z()).setType(Material.LANTERN, false);
 
-        // Two workstations support the two default residents per profession.
+        // A three-wide terraced staircase makes elevated cottages reachable even
+        // when the generation site is sloped.
+        buildEntranceRamp(world, door.x(), door.z(), baseY, door.outX(), door.outZ());
+
         world.getBlockAt(cx - 1, baseY + 1, cz + 2).setType(profile.workstation(), false);
         world.getBlockAt(cx + 1, baseY + 1, cz + 2).setType(profile.workstation(), false);
 
         placeBed(world, minX + 1, baseY + 1, minZ + 1, BlockFace.SOUTH, Material.RED_BED);
         placeBed(world, maxX - 1, baseY + 1, minZ + 1, BlockFace.SOUTH, Material.YELLOW_BED);
 
-        // Small visual identity marker by the entrance.
         Material marker = switch (profile) {
             case FARMER -> Material.HAY_BLOCK;
             case FLETCHER -> Material.TARGET;
@@ -107,19 +130,124 @@ public final class TownBuilder {
             case BUTCHER -> Material.BARREL;
             case MASON -> Material.STONE_BRICKS;
         };
-        int markerX = doorX;
-        int markerZ = doorZ;
-        if (doorX == minX) {
-            markerX--;
-        } else if (doorX == maxX) {
-            markerX++;
-        } else if (doorZ == minZ) {
-            markerZ--;
-        } else {
-            markerZ++;
-        }
+
+        int markerX = door.x() + door.outX();
+        int markerZ = door.z() + door.outZ();
         int markerY = GroundUtil.groundY(world, markerX, markerZ) + 1;
         world.getBlockAt(markerX, markerY, markerZ).setType(marker, false);
+    }
+
+    private static DoorInfo doorInfo(Location townCenter, CityProfession profile) {
+        int cx = townCenter.getBlockX() + profile.xOffset();
+        int cz = townCenter.getBlockZ() + profile.zOffset();
+        int minX = cx - 3;
+        int maxX = cx + 3;
+        int minZ = cz - 3;
+        int maxZ = cz + 3;
+
+        if (Math.abs(profile.xOffset()) >= Math.abs(profile.zOffset())
+                && profile.xOffset() != 0) {
+            if (profile.xOffset() > 0) {
+                return new DoorInfo(minX, cz, -1, 0);
+            }
+            return new DoorInfo(maxX, cz, 1, 0);
+        }
+
+        if (profile.zOffset() > 0) {
+            return new DoorInfo(cx, minZ, 0, -1);
+        }
+        return new DoorInfo(cx, maxZ, 0, 1);
+    }
+
+    /**
+     * Creates a reliable full-block staircase rather than decorative stair blocks.
+     * Villager pathfinding is happiest with one-block vertical changes and a
+     * three-block-wide route with clear headroom.
+     */
+    private static void buildEntranceRamp(
+            World world,
+            int doorX,
+            int doorZ,
+            int floorY,
+            int outX,
+            int outZ
+    ) {
+        int sideX = outZ;
+        int sideZ = -outX;
+        int previousTop = floorY;
+
+        for (int step = 1; step <= 32; step++) {
+            int centerX = doorX + outX * step;
+            int centerZ = doorZ + outZ * step;
+            int desiredTop = floorY - Math.max(0, step - 1);
+            int ground = GroundUtil.groundY(world, centerX, centerZ);
+
+            int topY;
+            boolean reachedGround;
+            if (ground >= desiredTop) {
+                topY = ground;
+                reachedGround = true;
+            } else {
+                topY = desiredTop;
+                reachedGround = false;
+            }
+
+            // Avoid introducing a two-block vertical jump at the final connection.
+            if (topY > previousTop + 1) {
+                topY = previousTop + 1;
+                reachedGround = false;
+            }
+
+            for (int width = -1; width <= 1; width++) {
+                int x = centerX + sideX * width;
+                int z = centerZ + sideZ * width;
+                int columnGround = GroundUtil.groundY(world, x, z);
+
+                for (int y = Math.min(columnGround + 1, topY); y < topY; y++) {
+                    world.getBlockAt(x, y, z).setType(Material.COBBLESTONE, false);
+                }
+
+                world.getBlockAt(x, topY, z).setType(Material.STONE_BRICKS, false);
+                clearColumn(world, x, z, topY + 1, topY + 3);
+            }
+
+            // Gentle lighting along one side without placing obstacles in the
+            // center lane used by villagers.
+            if (step % 5 == 0 && !reachedGround) {
+                int lx = centerX + sideX * 2;
+                int lz = centerZ + sideZ * 2;
+                int lightGround = GroundUtil.groundY(world, lx, lz);
+                int postY = Math.max(lightGround + 1, topY);
+                world.getBlockAt(lx, postY, lz).setType(Material.OAK_FENCE, false);
+                world.getBlockAt(lx, postY + 1, lz).setType(Material.LANTERN, false);
+            }
+
+            previousTop = topY;
+            if (reachedGround) {
+                break;
+            }
+        }
+    }
+
+    private static Integer findCottageFloorY(
+            World world,
+            Location townCenter,
+            CityProfession profile
+    ) {
+        int cx = townCenter.getBlockX() + profile.xOffset();
+        int cz = townCenter.getBlockZ() + profile.zOffset();
+
+        int[] xs = new int[]{cx - 1, cx + 1};
+        int z = cz + 2;
+
+        for (int x : xs) {
+            for (int y = world.getMinHeight(); y < world.getMaxHeight(); y++) {
+                if (world.getBlockAt(x, y, z).getType() == profile.workstation()) {
+                    return y - 1;
+                }
+            }
+        }
+        return null;
     }
 
     private static void buildFarm(World world, int cx, int cz) {
@@ -169,7 +297,14 @@ public final class TownBuilder {
         world.getBlockAt(x, y, z).setType(Material.OAK_FENCE, false);
     }
 
-    private static void placeBed(World world, int footX, int y, int footZ, BlockFace facing, Material material) {
+    private static void placeBed(
+            World world,
+            int footX,
+            int y,
+            int footZ,
+            BlockFace facing,
+            Material material
+    ) {
         int headX = footX + facing.getModX();
         int headZ = footZ + facing.getModZ();
 
@@ -226,8 +361,7 @@ public final class TownBuilder {
         int highest = world.getMinHeight() + 1;
         for (int x = minX; x <= maxX; x++) {
             for (int z = minZ; z <= maxZ; z++) {
-                highest = Math.max(highest,
-                        GroundUtil.groundY(world, x, z) + 1);
+                highest = Math.max(highest, GroundUtil.groundY(world, x, z) + 1);
             }
         }
         return Math.min(highest, world.getMaxHeight() - 8);
@@ -251,7 +385,13 @@ public final class TownBuilder {
         }
     }
 
-    private static void fillFoundation(World world, int x, int z, int targetY, Material material) {
+    private static void fillFoundation(
+            World world,
+            int x,
+            int z,
+            int targetY,
+            Material material
+    ) {
         int surface = GroundUtil.groundY(world, x, z);
         int from = Math.min(surface + 1, targetY);
         for (int y = from; y <= targetY; y++) {
@@ -263,5 +403,8 @@ public final class TownBuilder {
         for (int y = minY; y <= maxY && y < world.getMaxHeight(); y++) {
             world.getBlockAt(x, y, z).setType(Material.AIR, false);
         }
+    }
+
+    private record DoorInfo(int x, int z, int outX, int outZ) {
     }
 }
