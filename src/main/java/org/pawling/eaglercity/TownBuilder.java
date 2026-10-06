@@ -118,7 +118,7 @@ public final class TownBuilder {
         } else {
             markerZ++;
         }
-        int markerY = world.getHighestBlockYAt(markerX, markerZ, HeightMap.MOTION_BLOCKING_NO_LEAVES) + 1;
+        int markerY = GroundUtil.groundY(world, markerX, markerZ) + 1;
         world.getBlockAt(markerX, markerY, markerZ).setType(marker, false);
     }
 
@@ -165,7 +165,7 @@ public final class TownBuilder {
     }
 
     private static void setFenceAtSurface(World world, int x, int z) {
-        int y = world.getHighestBlockYAt(x, z, HeightMap.MOTION_BLOCKING_NO_LEAVES) + 1;
+        int y = GroundUtil.groundY(world, x, z) + 1;
         world.getBlockAt(x, y, z).setType(Material.OAK_FENCE, false);
     }
 
@@ -205,7 +205,7 @@ public final class TownBuilder {
             for (int dz = -1; dz <= 1; dz++) {
                 int x = cx + dx;
                 int z = cz + dz;
-                int y = world.getHighestBlockYAt(x, z, HeightMap.MOTION_BLOCKING_NO_LEAVES);
+                int y = GroundUtil.groundY(world, x, z);
                 Material top = world.getBlockAt(x, y, z).getType();
                 if (top == Material.WATER || top == Material.LAVA) {
                     continue;
@@ -227,7 +227,7 @@ public final class TownBuilder {
         for (int x = minX; x <= maxX; x++) {
             for (int z = minZ; z <= maxZ; z++) {
                 highest = Math.max(highest,
-                        world.getHighestBlockYAt(x, z, HeightMap.MOTION_BLOCKING_NO_LEAVES) + 1);
+                        GroundUtil.groundY(world, x, z) + 1);
             }
         }
         return Math.min(highest, world.getMaxHeight() - 8);
@@ -252,7 +252,7 @@ public final class TownBuilder {
     }
 
     private static void fillFoundation(World world, int x, int z, int targetY, Material material) {
-        int surface = world.getHighestBlockYAt(x, z, HeightMap.MOTION_BLOCKING_NO_LEAVES);
+        int surface = GroundUtil.groundY(world, x, z);
         int from = Math.min(surface + 1, targetY);
         for (int y = from; y <= targetY; y++) {
             world.getBlockAt(x, y, z).setType(material, false);
