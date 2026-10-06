@@ -1,0 +1,30 @@
+# EaglerCity 1.0.0
+#
+# The plugin deliberately owns one compact town per enabled Overworld.
+# It does not modify unrelated vanilla villages or iron golems.
+
+enabled-worlds: []
+
+town:
+  distance-from-spawn: 96
+  radius: 42
+  search-candidates: 24
+  residents-per-profession: 2
+
+economy:
+  heartbeat-ticks: 100
+  trade-radius: 10.0
+  trade-start-time: 8500
+  trade-end-time: 12000
+  trade-cooldown-ticks: 400
+  max-transfer-per-item: 8
+  daily-stock-enabled: true
+  daily-production-enabled: true
+
+security:
+  check-interval-ticks: 600
+  villagers-per-golem: 5
+  max-golems: 4
+  alert-range: 48.0
+  panic-speed: 1.35
+  golem-damage-multiplier: 5.0
