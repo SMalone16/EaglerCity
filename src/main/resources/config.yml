@@ -1,4 +1,4 @@
-# EaglerCity 1.0.0
+# EaglerCity 1.1.0
 #
 # The plugin deliberately owns one compact town per enabled Overworld.
 # It does not modify unrelated vanilla villages or iron golems.
@@ -10,6 +10,20 @@ town:
   radius: 42
   search-candidates: 24
   residents-per-profession: 2
+
+activity:
+  # Residents receive one pathfinding decision about every three seconds.
+  tick-ticks: 60
+  work-start-time: 1000
+  home-start-time: 12500
+  low-stock-ratio: 0.65
+  work-arrival-radius: 2.75
+  work-cooldown-ticks: 300
+  wander-change-ticks: 300
+  work-speed: 0.90
+  social-speed: 0.85
+  wander-speed: 0.72
+  home-speed: 0.82
 
 economy:
   heartbeat-ticks: 100
