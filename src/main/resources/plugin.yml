@@ -1,5 +1,5 @@
 name: EaglerCity
-version: 1.0.0
+version: 1.1.0
 main: org.pawling.eaglercity.EaglerCityPlugin
 api-version: '1.21'
 author: Pawling CSD
@@ -8,7 +8,7 @@ description: A living villager town economy and security simulation for the Eagl
 commands:
   eaglercity:
     description: Inspect or maintain the EaglerCity town.
-    usage: /eaglercity [status|repopulate|security|generate]
+    usage: /eaglercity [status|repopulate|security|generate|repair]
     aliases: [city]
     permission: eaglercity.admin
 
