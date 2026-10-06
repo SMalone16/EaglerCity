@@ -1,6 +1,5 @@
 package org.pawling.eaglercity;
 
-import org.bukkit.HeightMap;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Particle;
@@ -76,12 +75,15 @@ public final class TownManager {
         Location existing = loadCenter(world);
         if (existing != null) {
             townCenters.put(world.getUID(), existing);
+            ensureAccessUpgrade(world, existing);
             return existing;
         }
 
         Location center = chooseTownSite(world);
         TownBuilder.buildTown(plugin, world, center);
         saveCenter(world, center);
+        state.set(worldPath(world) + ".access-version", TownBuilder.accessVersion());
+        saveState();
         townCenters.put(world.getUID(), center);
 
         plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
@@ -90,6 +92,29 @@ public final class TownManager {
         }, 20L);
 
         return center;
+    }
+
+    private void ensureAccessUpgrade(World world, Location center) {
+        String path = worldPath(world) + ".access-version";
+        int installed = state.getInt(path, 1);
+        if (installed >= TownBuilder.accessVersion()) {
+            return;
+        }
+
+        TownBuilder.ensureTownAccess(plugin, world, center);
+        state.set(path, TownBuilder.accessVersion());
+        saveState();
+    }
+
+    public void repairAccess(World world) {
+        Location center = getTownCenter(world);
+        if (center == null) {
+            return;
+        }
+
+        TownBuilder.ensureTownAccess(plugin, world, center);
+        state.set(worldPath(world) + ".access-version", TownBuilder.accessVersion());
+        saveState();
     }
 
     public Location getTownCenter(World world) {
@@ -128,23 +153,23 @@ public final class TownManager {
     }
 
     private Villager spawnResident(World world, Location center, CityProfession profile, int index) {
-        double factor = 0.56;
-        int baseX = center.getBlockX() + (int) Math.round(profile.xOffset() * factor);
-        int baseZ = center.getBlockZ() + (int) Math.round(profile.zOffset() * factor);
-        int x = baseX + (index % 2 == 0 ? -1 : 1);
-        int z = baseZ + (index % 3 == 0 ? 1 : 0);
-        int y = GroundUtil.groundY(world, x, z) + 1;
+        Location home = getProfileHomeLocation(world, center, profile);
+        int x = home.getBlockX() + (index % 2 == 0 ? -1 : 1);
+        int z = home.getBlockZ();
+        int y = home.getBlockY();
 
         Villager villager = (Villager) world.spawnEntity(
                 new Location(world, x + 0.5, y, z + 0.5),
                 EntityType.VILLAGER
         );
         villager.setAdult();
+        villager.setAI(true);
         villager.setProfession(profile.profession());
         villager.setPersistent(true);
         villager.setRemoveWhenFarAway(false);
         villager.setCanPickupItems(true);
-        villager.customName(net.kyori.adventure.text.Component.text(profile.displayName() + " of Eagler City"));
+        villager.customName(net.kyori.adventure.text.Component.text(
+                profile.displayName() + " of Eagler City"));
         villager.setCustomNameVisible(false);
 
         villager.getPersistentDataContainer().set(residentKey, PersistentDataType.INTEGER, 1);
@@ -156,6 +181,110 @@ public final class TownManager {
         }
 
         return villager;
+    }
+
+    public Location getWorkLocation(Villager villager) {
+        CityProfession profile = getProfile(villager);
+        Location center = getTownCenter(villager.getWorld());
+        if (profile == null || center == null) {
+            return villager.getLocation();
+        }
+
+        int cx = center.getBlockX() + profile.xOffset();
+        int cz = center.getBlockZ() + profile.zOffset();
+        int preferredX = (Math.floorMod(villager.getUniqueId().hashCode(), 2) == 0)
+                ? cx - 1 : cx + 1;
+        Location workstation = findWorkstation(villager.getWorld(), preferredX, cz + 2, profile);
+
+        if (workstation == null) {
+            int otherX = preferredX == cx - 1 ? cx + 1 : cx - 1;
+            workstation = findWorkstation(villager.getWorld(), otherX, cz + 2, profile);
+        }
+
+        if (workstation != null) {
+            return workstation;
+        }
+        return getProfileHomeLocation(villager.getWorld(), center, profile);
+    }
+
+    public Location getHomeLocation(Villager villager) {
+        CityProfession profile = getProfile(villager);
+        Location center = getTownCenter(villager.getWorld());
+        if (profile == null || center == null) {
+            return villager.getLocation();
+        }
+        return getProfileHomeLocation(villager.getWorld(), center, profile);
+    }
+
+    private Location getProfileHomeLocation(
+            World world,
+            Location center,
+            CityProfession profile
+    ) {
+        int cx = center.getBlockX() + profile.xOffset();
+        int cz = center.getBlockZ() + profile.zOffset();
+
+        Location workstation = findWorkstation(world, cx - 1, cz + 2, profile);
+        if (workstation == null) {
+            workstation = findWorkstation(world, cx + 1, cz + 2, profile);
+        }
+
+        int y = workstation != null
+                ? workstation.getBlockY()
+                : GroundUtil.groundY(world, cx, cz) + 1;
+
+        return new Location(world, cx + 0.5, y, cz + 0.5);
+    }
+
+    private Location findWorkstation(
+            World world,
+            int x,
+            int z,
+            CityProfession profile
+    ) {
+        for (int y = world.getMinHeight(); y < world.getMaxHeight(); y++) {
+            if (world.getBlockAt(x, y, z).getType() == profile.workstation()) {
+                return new Location(world, x + 0.5, y, z + 0.5);
+            }
+        }
+        return null;
+    }
+
+    public Location getPlazaLocation(Villager villager) {
+        Location center = getTownCenter(villager.getWorld());
+        if (center == null) {
+            return villager.getLocation();
+        }
+
+        int hash = villager.getUniqueId().hashCode();
+        int dx = Math.floorMod(hash, 7) - 3;
+        int dz = Math.floorMod(hash / 7, 7) - 3;
+        int x = center.getBlockX() + dx;
+        int z = center.getBlockZ() + dz;
+        int y = GroundUtil.groundY(villager.getWorld(), x, z) + 1;
+        return new Location(villager.getWorld(), x + 0.5, y, z + 0.5);
+    }
+
+    public Location getWanderLocation(Villager villager, long phase) {
+        Location center = getTownCenter(villager.getWorld());
+        if (center == null) {
+            return villager.getLocation();
+        }
+
+        long seed = villager.getUniqueId().getLeastSignificantBits() ^ (phase * 0x9E3779B97F4A7C15L);
+        int dx = (int) Math.floorMod(seed, 21L) - 10;
+        int dz = (int) Math.floorMod(seed >>> 12, 21L) - 10;
+
+        int x = center.getBlockX() + dx;
+        int z = center.getBlockZ() + dz;
+        int y = GroundUtil.groundY(villager.getWorld(), x, z) + 1;
+
+        Material ground = villager.getWorld().getBlockAt(x, y - 1, z).getType();
+        if (ground == Material.WATER || ground == Material.LAVA) {
+            return getPlazaLocation(villager);
+        }
+
+        return new Location(villager.getWorld(), x + 0.5, y, z + 0.5);
     }
 
     public void ensureSecurity(World world) {
@@ -206,11 +335,13 @@ public final class TownManager {
 
         double range = Math.max(8.0,
                 plugin.getConfig().getDouble("security.alert-range", 48.0));
-        IronGolem nearest = world.getNearbyEntities(villager.getLocation(), range, range, range).stream()
+        IronGolem nearest = world.getNearbyEntities(
+                        villager.getLocation(), range, range, range).stream()
                 .filter(IronGolem.class::isInstance)
                 .map(IronGolem.class::cast)
                 .filter(this::isCityGolem)
-                .min(Comparator.comparingDouble(g -> g.getLocation().distanceSquared(villager.getLocation())))
+                .min(Comparator.comparingDouble(
+                        g -> g.getLocation().distanceSquared(villager.getLocation())))
                 .orElse(null);
 
         panicUntil.put(villager.getUniqueId(), System.currentTimeMillis() + 6000L);
@@ -230,9 +361,17 @@ public final class TownManager {
             }
         }
 
-        world.spawnParticle(Particle.ANGRY_VILLAGER,
-                villager.getLocation().add(0, 1.2, 0), 5, 0.4, 0.4, 0.4, 0.0);
-        world.playSound(villager.getLocation(), Sound.ENTITY_VILLAGER_NO, 1.0f, 1.1f);
+        world.spawnParticle(
+                Particle.ANGRY_VILLAGER,
+                villager.getLocation().add(0, 1.2, 0),
+                5, 0.4, 0.4, 0.4, 0.0
+        );
+        world.playSound(
+                villager.getLocation(),
+                Sound.ENTITY_VILLAGER_NO,
+                1.0f,
+                1.1f
+        );
     }
 
     public boolean isPanicking(Villager villager) {
@@ -246,16 +385,19 @@ public final class TownManager {
 
     public boolean isCityResident(Entity entity) {
         return entity instanceof Villager
-                && entity.getPersistentDataContainer().has(residentKey, PersistentDataType.INTEGER);
+                && entity.getPersistentDataContainer().has(
+                        residentKey, PersistentDataType.INTEGER);
     }
 
     public boolean isCityGolem(Entity entity) {
         return entity instanceof IronGolem
-                && entity.getPersistentDataContainer().has(golemKey, PersistentDataType.INTEGER);
+                && entity.getPersistentDataContainer().has(
+                        golemKey, PersistentDataType.INTEGER);
     }
 
     public String getProfileId(Villager villager) {
-        return villager.getPersistentDataContainer().get(profileKey, PersistentDataType.STRING);
+        return villager.getPersistentDataContainer()
+                .get(profileKey, PersistentDataType.STRING);
     }
 
     public CityProfession getProfile(Villager villager) {
@@ -283,7 +425,10 @@ public final class TownManager {
     }
 
     public long getLastEconomyDay(World world) {
-        return state.getLong(worldPath(world) + ".last-economy-day", Long.MIN_VALUE);
+        return state.getLong(
+                worldPath(world) + ".last-economy-day",
+                Long.MIN_VALUE
+        );
     }
 
     public void setLastEconomyDay(World world, long day) {
@@ -348,8 +493,8 @@ public final class TownManager {
             for (int dz = -22; dz <= 22; dz += 11) {
                 int x = cx + dx;
                 int z = cz + dz;
-                int y = world.getHighestBlockYAt(x, z, HeightMap.MOTION_BLOCKING_NO_LEAVES);
-                Material top = world.getBlockAt(x, y, z).getType();
+                int y = GroundUtil.groundY(world, x, z);
+                Material top = GroundUtil.surfaceMaterial(world, x, z);
 
                 minY = Math.min(minY, y);
                 maxY = Math.max(maxY, y);
@@ -374,7 +519,8 @@ public final class TownManager {
         if (!state.getBoolean(path + ".generated", false)) {
             return null;
         }
-        if (!state.contains(path + ".center-x") || !state.contains(path + ".center-z")) {
+        if (!state.contains(path + ".center-x")
+                || !state.contains(path + ".center-z")) {
             return null;
         }
         return new Location(
@@ -402,7 +548,8 @@ public final class TownManager {
         try {
             state.save(stateFile);
         } catch (IOException e) {
-            plugin.getLogger().severe("Could not save EaglerCity state.yml: " + e.getMessage());
+            plugin.getLogger().severe(
+                    "Could not save EaglerCity state.yml: " + e.getMessage());
         }
     }
 }
