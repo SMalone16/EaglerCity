@@ -450,8 +450,14 @@ public final class EconomyManager {
             int donorCount = count(donorInventory, material);
             int receiverCount = count(receiverInventory, material);
             int donorTarget = donorProfile.targets().getOrDefault(material, 0);
+            double reserveRatio = Math.max(0.5, Math.min(1.0,
+                    plugin.getConfig().getDouble(
+                            "economy.trade-reserve-ratio", 0.85)));
+            int donorReserve = donorTarget <= 0
+                    ? 0
+                    : (int) Math.ceil(donorTarget * reserveRatio);
 
-            int excess = donorCount - donorTarget;
+            int excess = donorCount - donorReserve;
             int need = receiverTarget - receiverCount;
             if (excess <= 0 || need <= 0) {
                 continue;
