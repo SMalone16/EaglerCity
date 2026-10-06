@@ -16,7 +16,7 @@ activity:
   tick-ticks: 60
   work-start-time: 1000
   home-start-time: 12500
-  low-stock-ratio: 0.65
+  low-stock-ratio: 0.80
   work-arrival-radius: 2.75
   work-cooldown-ticks: 300
   wander-change-ticks: 300
@@ -27,7 +27,7 @@ activity:
 
 economy:
   heartbeat-ticks: 100
-  trade-radius: 10.0
+  trade-radius: 10.0\n  trade-reserve-ratio: 0.85
   trade-start-time: 8500
   trade-end-time: 12000
   trade-cooldown-ticks: 400
