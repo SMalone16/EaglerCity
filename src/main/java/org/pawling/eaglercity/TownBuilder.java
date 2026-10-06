@@ -131,8 +131,8 @@ public final class TownBuilder {
             case MASON -> Material.STONE_BRICKS;
         };
 
-        int markerX = door.x() + door.outX();
-        int markerZ = door.z() + door.outZ();
+        int markerX = door.x() + door.outX() + door.outZ() * 2;
+        int markerZ = door.z() + door.outZ() - door.outX() * 2;
         int markerY = GroundUtil.groundY(world, markerX, markerZ) + 1;
         world.getBlockAt(markerX, markerY, markerZ).setType(marker, false);
     }
