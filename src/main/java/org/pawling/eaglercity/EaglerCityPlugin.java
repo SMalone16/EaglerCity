@@ -29,6 +29,7 @@ public final class EaglerCityPlugin extends JavaPlugin
     private TownManager townManager;
     private EconomyManager economyManager;
     private ActivityManager activityManager;
+    private Undercity undercity;
 
     @Override
     public void onEnable() {
@@ -47,6 +48,8 @@ public final class EaglerCityPlugin extends JavaPlugin
                 golemKey,
                 profileKey
         );
+        undercity = new Undercity(this, townManager);
+        getServer().getPluginManager().registerEvents(undercity, this);
         economyManager = new EconomyManager(this, townManager);
         activityManager = new ActivityManager(
                 this,
@@ -62,6 +65,9 @@ public final class EaglerCityPlugin extends JavaPlugin
         }
 
         getServer().getScheduler().runTask(this, townManager::initialize);
+        getServer().getScheduler().runTaskLater(this, () -> {
+            for (World world : getServer().getWorlds()) undercity.ensure(world);
+        }, 60L);
 
         long activityHeartbeat = Math.max(
                 40L,
@@ -111,7 +117,10 @@ public final class EaglerCityPlugin extends JavaPlugin
         if (townManager.isEnabledWorld(event.getWorld())) {
             getServer().getScheduler().runTask(
                     this,
-                    () -> townManager.ensureTown(event.getWorld())
+                    () -> {
+                        townManager.ensureTown(event.getWorld());
+                        getServer().getScheduler().runTaskLater(this, () -> undercity.ensure(event.getWorld()), 60L);
+                    }
             );
         }
     }
@@ -222,6 +231,7 @@ public final class EaglerCityPlugin extends JavaPlugin
                     sender.sendMessage(townManager.status(world));
             case "generate" -> {
                 townManager.ensureTown(world);
+                getServer().getScheduler().runTaskLater(this, () -> undercity.ensure(world), 60L);
                 sender.sendMessage(
                         "EaglerCity town is ready in "
                                 + world.getName() + ".");
