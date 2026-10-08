@@ -86,3 +86,6 @@ dist/EaglerCity-1.1.0.jar
 
 EaglerCity is designed for the Paper 1.21.11 backend and requires no client-side changes,
 ProtocolLib, or Eaglercraft browser-client modifications.
+
+## Optional Undercity integration
+When EaglerZombiesFall26 is enabled, EaglerCity incrementally excavates a **40×30×20** cavern whose ceiling is ten blocks below the existing city floor. A protected **16×16×16** stepped temple contains four branches and an iron-doored loot chamber. Two outside shrine markers and four inside room markers are populated by the Zombie plugin, and the optional elevator reads the saved entrance coordinates. The world persists `eaglercity:undercity_x`, `eaglercity:undercity_y`, `eaglercity:undercity_z`, and `eaglercity:undercity_ready` integer keys. The published Y is **cavern floor level**. Loot plugin absence leaves a basic fallback chest; the city alone remains functional. The excavation is one-time per world and cannot be mined or modified by players, pistons, explosions or fluid placement. The iron loot door opens briefly for player interactions.
