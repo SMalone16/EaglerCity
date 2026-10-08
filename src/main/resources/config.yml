@@ -42,3 +42,9 @@ security:
   alert-range: 48.0
   panic-speed: 1.35
   golem-damage-multiplier: 5.0
+
+# Generates a 40x30x20 Undercity under an existing city without touching cottages.
+# By default, the city remains a fully standalone plugin when Zombies is absent.
+undercity:
+  enabled: true
+  generate-without-zombies: false
