@@ -295,7 +295,7 @@ public final class Undercity implements Listener {
         if (e.getBlocks().stream().anyMatch(b -> inside(b) || inside(b.getRelative(e.getDirection())))) e.setCancelled(true);
     }
 
-    @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onTreasureDoor(PlayerInteractEvent event) {
         if (event.getClickedBlock() == null || event.getAction() != org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) return;
         Block clicked = event.getClickedBlock();
