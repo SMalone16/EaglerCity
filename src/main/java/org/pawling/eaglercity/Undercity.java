@@ -100,6 +100,7 @@ public final class Undercity implements Listener {
                     buildTemple(world, cx, floor, cz);
                     buildFrontSpawners(world, cx, floor, cz);
                     buildBridges(world, cx, floor, cz);
+                    buildFallbackLadder(world, cx, floor, cz);
                     saved.set(path + ".built", true);
                     saved.set(path + ".x", cx);
                     saved.set(path + ".y", floor);
@@ -226,6 +227,32 @@ public final class Undercity implements Listener {
                     ladder.setBlockData(data, false);
                 }
             }
+    }
+
+
+    /** Always provide a basic way out, even if the optional elevator is off. */
+    private void buildFallbackLadder(World w, int x, int y, int z) {
+        int cityY = y + 29;
+        for (int elevation = y + 1; elevation <= cityY + 2; elevation++) {
+            set(w, x, y, z, 0, elevation - y, -14, Material.STONE_BRICKS);
+            Block ladder = w.getBlockAt(x, elevation, z - 13);
+            ladder.setType(Material.LADDER, false);
+            org.bukkit.block.data.Directional facing = (org.bukkit.block.data.Directional) ladder.getBlockData();
+            facing.setFacing(org.bukkit.block.BlockFace.SOUTH);
+            ladder.setBlockData(facing, false);
+        }
+        // A surface platform and clear, southerly exit connect the ladder to town.
+        for (int dx = -1; dx <= 1; dx++)
+            for (int dz = -13; dz <= -11; dz++)
+                set(w, x, y, z, dx, cityY - y, dz, Material.SMOOTH_STONE);
+        set(w, x, y, z, 0, cityY - y, -13, Material.LADDER);
+        Block topLadder = w.getBlockAt(x, cityY, z - 13);
+        org.bukkit.block.data.Directional data = (org.bukkit.block.data.Directional) topLadder.getBlockData();
+        data.setFacing(org.bukkit.block.BlockFace.SOUTH);
+        topLadder.setBlockData(data, false);
+        for (int dy = 1; dy <= 3; dy++) {
+            set(w, x, y, z, 0, cityY - y + dy, -12, Material.AIR);
+        }
     }
 
     private boolean inside(World w, int x, int y, int z) {
