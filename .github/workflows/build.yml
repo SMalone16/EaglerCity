@@ -27,6 +27,18 @@ jobs:
           java-version: '21'
           cache: maven
 
+      - name: Validate plugin YAML resources
+        run: |
+          ruby -ryaml -e 'ARGV.each { |file| YAML.load_file(file) }' src/main/resources/plugin.yml src/main/resources/config.yml
+          python3 - <<'PY'
+          from pathlib import Path
+          for path in Path("src/main/resources").rglob("*.yml"):
+              contents = path.read_text(encoding="utf-8")
+              if r"\n" in contents:
+                  raise SystemExit(f"Literal escaped newline in YAML resource: {path}")
+          print("YAML resources passed parsing and newline validation")
+          PY
+
       - name: Build plugin
         run: mvn -B clean package
 
