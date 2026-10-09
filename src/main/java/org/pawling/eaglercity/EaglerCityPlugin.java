@@ -22,6 +22,12 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.projectiles.ProjectileSource;
 
 import java.util.List;
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Locale;
 
 public final class EaglerCityPlugin extends JavaPlugin
@@ -34,6 +40,7 @@ public final class EaglerCityPlugin extends JavaPlugin
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        repairLegacyConfigNewline();
 
         NamespacedKey residentKey =
                 new NamespacedKey(this, "city_resident");
@@ -110,6 +117,35 @@ public final class EaglerCityPlugin extends JavaPlugin
         getLogger().info(
                 "EaglerCity 1.1.0 enabled: accessible cottages, "
                         + "resident schedules, economy, and security online.");
+    }
+
+
+    /**
+     * Builds shipped before the YAML hotfix contained a literal backslash-n
+     * between trade-radius and trade-reserve-ratio. Paper saveDefaultConfig()
+     * does not overwrite the copy already persisted in a Codespace, so repair
+     * only this exact legacy defect without changing other teacher settings.
+     */
+    private void repairLegacyConfigNewline() {
+        File config = new File(getDataFolder(), "config.yml");
+        Path path = config.toPath();
+        if (!Files.isRegularFile(path)) return;
+        try {
+            String original = Files.readString(path, StandardCharsets.UTF_8);
+            String broken = "\\n  trade-reserve-ratio:";
+            if (!original.contains(broken)) return;
+            Path backup = path.resolveSibling("config.yml.before-yaml-newline-fix.bak");
+            if (!Files.exists(backup))
+                Files.copy(path, backup, StandardCopyOption.COPY_ATTRIBUTES);
+            String repaired = original.replace(broken, "\n  trade-reserve-ratio:");
+            Files.writeString(path, repaired, StandardCharsets.UTF_8);
+            reloadConfig();
+            getLogger().info("Repaired legacy config.yml newline; original backed up at "
+                    + backup.getFileName());
+        } catch (IOException exception) {
+            getLogger().severe("Unable to repair legacy config.yml safely: "
+                    + exception.getMessage());
+        }
     }
 
     @EventHandler
