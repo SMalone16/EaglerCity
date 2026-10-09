@@ -27,7 +27,8 @@ activity:
 
 economy:
   heartbeat-ticks: 100
-  trade-radius: 10.0\n  trade-reserve-ratio: 0.85
+  trade-radius: 10.0
+  trade-reserve-ratio: 0.85
   trade-start-time: 8500
   trade-end-time: 12000
   trade-cooldown-ticks: 400
